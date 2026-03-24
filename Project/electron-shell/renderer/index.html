@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; script-src 'self';">
+  <title>Secure Agentic Browser</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- ================================================================ -->
+  <!-- COMMAND BAR (top)                                                -->
+  <!-- ================================================================ -->
+  <header id="command-bar" class="command-bar">
+    <div class="command-bar__left">
+      <div class="command-bar__logo" title="Secure Agentic Browser">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <path d="M12 2L3 7v6c0 5.25 3.75 10.14 9 11.24C17.25 23.14 21 18.25 21 13V7l-9-5z"
+                stroke="url(#shield-grad)" stroke-width="2" fill="none"/>
+          <path d="M9 12l2 2 4-4" stroke="url(#shield-grad)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <defs>
+            <linearGradient id="shield-grad" x1="3" y1="2" x2="21" y2="24">
+              <stop offset="0%" stop-color="#6366f1"/>
+              <stop offset="100%" stop-color="#06b6d4"/>
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+      <div class="command-bar__address" id="address-bar">
+        <input type="text"
+               id="address-input"
+               class="command-bar__address-input"
+               placeholder="Enter URL or search..."
+               spellcheck="false"
+               autocomplete="off">
+      </div>
+    </div>
+
+    <div class="command-bar__center">
+      <div class="command-bar__agent-input-wrap">
+        <input type="text"
+               id="agent-input"
+               class="command-bar__agent-input"
+               placeholder="Ask the agent anything... (e.g., 'Find the best laptop under $500')"
+               spellcheck="false"
+               autocomplete="off">
+        <button id="agent-send-btn" class="command-bar__send-btn" title="Send to agent" disabled>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <path d="M22 2L11 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <button id="agent-stop-btn" class="command-bar__stop-btn hidden" title="Stop agent">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" stroke-width="2" fill="currentColor" opacity="0.8"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="command-bar__right">
+      <div id="backend-status" class="status-indicator status-indicator--disconnected" title="Backend disconnected">
+        <span class="status-indicator__dot"></span>
+        <span class="status-indicator__label">Offline</span>
+      </div>
+      <div id="risk-badge" class="risk-badge risk-badge--safe" title="Current risk level">
+        <span class="risk-badge__icon">🛡️</span>
+        <span class="risk-badge__label">Safe</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ================================================================ -->
+  <!-- MAIN CONTENT AREA                                                -->
+  <!-- The BrowserView (Chromium) is positioned by Electron behind this -->
+  <!-- ================================================================ -->
+  <main id="main-content" class="main-content">
+    <!-- This div acts as a transparent overlay where the BrowserView sits behind -->
+    <div id="browser-viewport" class="browser-viewport">
+      <!-- Welcome screen shown when no page is loaded -->
+      <div id="welcome-screen" class="welcome-screen">
+        <div class="welcome-screen__content">
+          <div class="welcome-screen__icon">
+            <svg width="80" height="80" viewBox="0 0 24 24" fill="none">
+              <path d="M12 2L3 7v6c0 5.25 3.75 10.14 9 11.24C17.25 23.14 21 18.25 21 13V7l-9-5z"
+                    stroke="url(#welcome-grad)" stroke-width="1.5" fill="none"/>
+              <path d="M9 12l2 2 4-4" stroke="url(#welcome-grad)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <defs>
+                <linearGradient id="welcome-grad" x1="3" y1="2" x2="21" y2="24">
+                  <stop offset="0%" stop-color="#6366f1"/>
+                  <stop offset="100%" stop-color="#06b6d4"/>
+                </linearGradient>
+              </defs>
+            </svg>
+          </div>
+          <h1 class="welcome-screen__title">Secure Agentic Browser</h1>
+          <p class="welcome-screen__subtitle">Enter a URL above or ask the agent to do something for you.</p>
+          <div class="welcome-screen__examples">
+            <button class="welcome-screen__example" data-goal="Go to wikipedia.org and find today's featured article">
+              📖 Find today's featured Wikipedia article
+            </button>
+            <button class="welcome-screen__example" data-goal="Search for the latest AI research papers on arxiv.org">
+              🔬 Search latest AI papers on arXiv
+            </button>
+            <button class="welcome-screen__example" data-goal="Go to news.ycombinator.com and summarize the top 3 stories">
+              📰 Summarize top Hacker News stories
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Thought overlay (agent reasoning bubbles) -->
+      <div id="thought-overlay" class="thought-overlay"></div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- SIDEBAR (right)                                              -->
+    <!-- ============================================================ -->
+    <aside id="sidebar" class="sidebar">
+      <div class="sidebar__tabs">
+        <button class="sidebar__tab sidebar__tab--active" data-tab="timeline">Timeline</button>
+        <button class="sidebar__tab" data-tab="risk">Risk</button>
+        <button class="sidebar__tab" data-tab="permissions">Permissions</button>
+      </div>
+
+      <!-- Action Timeline Tab -->
+      <div id="tab-timeline" class="sidebar__panel sidebar__panel--active">
+        <div id="action-timeline" class="action-timeline">
+          <div class="action-timeline__empty">
+            <p>No actions yet.</p>
+            <p class="action-timeline__hint">Ask the agent to do something to see its actions here.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Risk Dashboard Tab -->
+      <div id="tab-risk" class="sidebar__panel">
+        <div id="risk-dashboard" class="risk-dashboard">
+          <div class="risk-dashboard__gauge-container">
+            <svg id="risk-gauge" class="risk-dashboard__gauge" viewBox="0 0 200 120">
+              <defs>
+                <linearGradient id="gauge-bg-grad" x1="0" y1="0" x2="200" y2="0">
+                  <stop offset="0%" stop-color="#22c55e"/>
+                  <stop offset="50%" stop-color="#eab308"/>
+                  <stop offset="100%" stop-color="#ef4444"/>
+                </linearGradient>
+              </defs>
+              <!-- Background arc -->
+              <path d="M 20 110 A 80 80 0 0 1 180 110"
+                    fill="none" stroke="#1e1e2e" stroke-width="12" stroke-linecap="round"/>
+              <!-- Colored arc -->
+              <path d="M 20 110 A 80 80 0 0 1 180 110"
+                    fill="none" stroke="url(#gauge-bg-grad)" stroke-width="12" stroke-linecap="round" opacity="0.3"/>
+              <!-- Needle -->
+              <line id="risk-needle" x1="100" y1="110" x2="100" y2="35"
+                    stroke="#6366f1" stroke-width="3" stroke-linecap="round"
+                    transform="rotate(-90, 100, 110)"/>
+              <!-- Center dot -->
+              <circle cx="100" cy="110" r="6" fill="#6366f1"/>
+            </svg>
+            <div class="risk-dashboard__score-display">
+              <span id="risk-score-value" class="risk-dashboard__score-value">0.00</span>
+              <span id="risk-score-level" class="risk-dashboard__score-level">SAFE</span>
+            </div>
+          </div>
+          <div id="risk-breakdown" class="risk-dashboard__breakdown">
+            <p class="risk-dashboard__empty-text">No risk data yet.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Permissions Tab -->
+      <div id="tab-permissions" class="sidebar__panel">
+        <div id="permission-manager" class="permission-manager">
+          <p class="permission-manager__empty-text">Navigate to a site to manage permissions.</p>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <!-- ================================================================ -->
+  <!-- HitL Dialog (modal overlay)                                     -->
+  <!-- ================================================================ -->
+  <div id="hitl-dialog-overlay" class="hitl-overlay hidden">
+    <div class="hitl-dialog">
+      <div class="hitl-dialog__header">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+          <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
+                stroke="#f59e0b" stroke-width="2" fill="none"/>
+          <line x1="12" y1="9" x2="12" y2="13" stroke="#f59e0b" stroke-width="2" stroke-linecap="round"/>
+          <circle cx="12" cy="17" r="1" fill="#f59e0b"/>
+        </svg>
+        <h2>High-Risk Action Detected</h2>
+      </div>
+      <div id="hitl-dialog-body" class="hitl-dialog__body">
+        <!-- Populated dynamically -->
+      </div>
+      <div class="hitl-dialog__actions">
+        <button id="hitl-deny-btn" class="hitl-dialog__btn hitl-dialog__btn--deny">
+          ✕ Deny
+        </button>
+        <button id="hitl-approve-btn" class="hitl-dialog__btn hitl-dialog__btn--approve">
+          ✓ Approve
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="app.js"></script>
+</body>
+</html>
