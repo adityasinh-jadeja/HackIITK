@@ -96,7 +96,7 @@ function setupIPCHandlers() {
   ipcMain.handle("send-goal", async (_event, goal) => {
     console.log("[main] Received goal:", goal);
     try {
-        await fetch('http://localhost:5000/api/agent/start', {
+        await fetch('http://localhost:8000/api/agent/start', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ goal })
@@ -110,6 +110,11 @@ function setupIPCHandlers() {
   // Manual stop of agent
   ipcMain.handle("stop-agent", async () => {
     console.log("[main] Stop agent requested");
+    try {
+        await fetch('http://localhost:8000/api/agent/stop', { method: 'POST' });
+    } catch (err) {
+        console.error("Backend offline?");
+    }
     return true;
   });
 

@@ -1,0 +1,14 @@
+fastapi
+uvicorn[standard]
+motor
+pydantic
+pydantic-settings
+python-dotenv
+google-generativeai
+playwright
+beautifulsoup4
+lxml
+httpx
+pytest
+pytest-asyncio
+anyio
