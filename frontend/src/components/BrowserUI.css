@@ -1,0 +1,83 @@
+.browser-ui-container {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.command-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 60px;
+    padding: 0 1rem;
+    background-color: var(--bg-panel);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.command-bar-left, .command-bar-center, .command-bar-right {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.command-bar-left { flex: 1; }
+.command-bar-center { flex: 2; justify-content: center; }
+.command-bar-right { flex: 1; justify-content: flex-end; }
+
+.address-bar { width: 100%; max-width: 400px; }
+.address-bar input, .agent-input-wrap input {
+    width: 100%;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    border: 1px solid var(--border-color);
+    background-color: var(--bg-darker);
+    color: var(--text-primary);
+    outline: none;
+}
+
+.agent-input-wrap {
+    display: flex;
+    align-items: center;
+    background-color: var(--bg-darker);
+    border-radius: 20px;
+    border: 1px solid var(--border-color);
+    padding: 0 0.5rem 0 0;
+    width: 100%;
+    max-width: 600px;
+}
+.agent-input-wrap input { border: none; }
+
+.agent-btn, .dashboard-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-primary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.agent-btn:disabled { color: var(--text-secondary); cursor: not-allowed; }
+.hidden { display: none; }
+
+.status-indicator { display: flex; align-items: center; gap: 0.3rem; font-size: 0.85rem; }
+.status-indicator .dot { width: 8px; height: 8px; border-radius: 50%; }
+.status-indicator.connected .dot { background-color: var(--color-green); }
+.status-indicator.disconnected .dot { background-color: var(--color-red); }
+
+.risk-badge {
+    padding: 0.3rem 0.8rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    font-weight: bold;
+}
+.risk-badge.safe { color: var(--color-green); border: 1px solid var(--color-green); }
+
+.main-content {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* The electron BrowserView will lay over this */
+}
+.welcome-screen { text-align: center; color: var(--text-secondary); }

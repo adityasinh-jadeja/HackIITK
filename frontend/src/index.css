@@ -1,0 +1,32 @@
+:root {
+  --bg-main: #2b2a2a;
+  --bg-panel: #202020;
+  --bg-darker: #151515;
+  --text-primary: #e0e0e0;
+  --text-secondary: #a0a0a0;
+  --border-color: #3a3a3a;
+  --color-green: #4caf50;
+  --color-red: #ff4d4d;
+  --color-yellow: #ffc107;
+  --color-orange: #ff9800;
+  --accent-blue: #4169e1;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  background-color: var(--bg-main);
+  color: var(--text-primary);
+  height: 100vh;
+  overflow: hidden;
+}
+
+* { box-sizing: border-box; }
+
+/* Dashboard layout specific */
+.app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
