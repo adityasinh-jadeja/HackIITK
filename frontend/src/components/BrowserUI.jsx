@@ -36,11 +36,23 @@ const BrowserUI = () => {
   const handleNavigate = (e) => {
     if (e.key === 'Enter' && window.electronAPI) {
       let finalUrl = url.trim();
-      if (!finalUrl.startsWith('http://') && !finalUrl.startsWith('https://')) {
+      if (!finalUrl.startsWith('http://') && !finalUrl.startsWith('https://') && !finalUrl.startsWith('file://')) {
         finalUrl = 'https://' + finalUrl;
       }
       setUrl(finalUrl);
       window.electronAPI.navigateTo(finalUrl);
+    }
+  };
+
+  const handleScanPage = async () => {
+    try {
+      if (window.electronAPI && window.electronAPI.toggleDashboard) {
+        window.electronAPI.toggleDashboard(true);
+      }
+      const targetUrl = url || 'http://example.com';
+      navigate('/dashboard', { state: { triggerScanUrl: targetUrl } });
+    } catch (err) {
+      console.error("Failed to navigate to dashboard:", err);
     }
   };
 
@@ -88,6 +100,9 @@ const BrowserUI = () => {
               placeholder="Enter URL or search..." 
               spellCheck="false" 
             />
+            <button className="scan-btn" onClick={handleScanPage} style={{background: '#3b82f6', color: 'white', border: 'none', padding: '0 12px', cursor: 'pointer', borderRadius: '4px'}}>
+              Scan
+            </button>
           </div>
         </div>
 

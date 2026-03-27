@@ -22,7 +22,9 @@ export function useWebSocket() {
     ws.onmessage = (event) => {
       const msg = JSON.parse(event.data);
       if (msg.type === 'DASHBOARD_UPDATE') {
-        setDashboardData(msg.data);
+        setDashboardData(prev => ({ ...prev, ...msg.data }));
+      } else if (msg.type === 'SCAN_COMPLETE' || msg.type === 'SCAN_STARTED') {
+        setDashboardData(prev => ({ ...prev, ...msg.data }));
       }
     };
 

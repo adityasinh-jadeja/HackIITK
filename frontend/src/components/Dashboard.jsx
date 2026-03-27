@@ -1,9 +1,34 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useWebSocket } from '../hooks/useWebSocket';
 import './Dashboard.css';
 
 const Dashboard = () => {
+    const navigate = useNavigate();
+    const location = useLocation();
     const { connected, dashboardData: liveData } = useWebSocket();
+    const [localScanning, setLocalScanning] = useState(false);
+
+    useEffect(() => {
+        if (location.state?.triggerScanUrl) {
+            setLocalScanning(true);
+            const triggerUrl = location.state.triggerScanUrl;
+            
+            // Clear the location state so it doesn't re-trigger on remount
+            window.history.replaceState({}, document.title)
+
+            fetch('http://localhost:8000/api/scan', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url: triggerUrl })
+            }).then(() => {
+                setLocalScanning(false);
+            }).catch(err => {
+                console.error(err);
+                setLocalScanning(false);
+            });
+        }
+    }, [location.state]);
 
     // Fallback data when initial load happens or disconnected
     const data = liveData || {
@@ -40,10 +65,8 @@ const Dashboard = () => {
     const closeDashboard = () => {
         if (window.electronAPI) {
              window.electronAPI.toggleDashboard(false);
-             window.location.hash = '/';
-        } else {
-             window.location.hash = '/';
         }
+        navigate('/');
     };
 
     return (
@@ -208,10 +231,7 @@ const Dashboard = () => {
                             {threats.length === 0 ? (
                                 <p style={{color: 'var(--text-secondary)', fontSize: '0.85rem'}}>No threats logged.</p>
                             ) : threats.map((threat, idx) => (
-                                <div key={idx} className={`threat-card border-${(threat.severity || threat.level || 'high').toLowerCase()}`}>
-                                    <h4>{threat.type || threat.title}</h4>
-                                    <p>{threat.description || threat.detail} · {threat.severity || threat.level}</p>
-                                </div>
+                                <ThreatCard key={idx} threat={threat} />
                             ))}
                         </div>
                     </section>
@@ -249,5 +269,36 @@ const RiskItem = ({ label, value, colorClass }) => (
         </div>
     </div>
 );
+
+const ThreatCard = ({ threat }) => {
+    const [expanded, setExpanded] = React.useState(false);
+    return (
+        <div className={`threat-card border-${(threat.severity || 'high').toLowerCase()}`}>
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                <h4>{threat.type || 'Unknown Threat'}</h4>
+                <span className={`risk-pill ${(threat.severity || 'high').toLowerCase()}`} style={{fontSize: '0.7rem', padding: '2px 6px'}}>
+                    {threat.severity?.toUpperCase() || 'HIGH'}
+                </span>
+            </div>
+            <p>{threat.description}</p>
+            <p style={{fontSize: '0.8rem', color: '#999', marginTop: '4px'}}>
+                <strong>Confidence:</strong> {Math.round((threat.confidence || 1) * 100)}%
+                <br/><strong>XPath:</strong> <span style={{fontFamily: 'monospace', color: '#ccc'}}>{threat.element_xpath || 'N/A'}</span>
+            </p>
+            {threat.element_html && (
+                <div style={{marginTop: '0.5rem'}}>
+                    <button onClick={() => setExpanded(!expanded)} style={{fontSize: '0.75rem', cursor: 'pointer', background: 'transparent', border: '1px solid #444', color: '#ccc', borderRadius: '4px', padding: '2px 8px'}}>
+                        {expanded ? 'Hide HTML' : 'View Raw HTML'}
+                    </button>
+                    {expanded && (
+                        <pre style={{background: '#1e1e1e', padding: '0.5rem', borderRadius: '4px', marginTop: '0.5rem', fontSize: '0.75rem', overflowX: 'auto', color: '#a6e22e', borderLeft: '2px solid #3b82f6'}}>
+                            {threat.element_html}
+                        </pre>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+};
 
 export default Dashboard;

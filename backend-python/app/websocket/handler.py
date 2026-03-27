@@ -25,8 +25,11 @@ class WebSocketManager:
             self.active_connections.remove(websocket)
 
     async def broadcast(self, data: dict):
-        self.current_state.update(data.get("data", data))
-        message = json.dumps({"type": data.get("type", "DASHBOARD_UPDATE"), "data": data})
+        payload = data.get("data", data)
+        self.current_state.update(payload)
+        
+        msg_type = data.get("type", "DASHBOARD_UPDATE")
+        message = json.dumps({"type": msg_type, "data": payload})
         for connection in self.active_connections:
             try:
                 await connection.send_text(message)
