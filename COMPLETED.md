@@ -81,3 +81,45 @@ Now that the DOM Scanner is independently functioning and reporting localized UI
 4. Click the blue **Scan** button next to the URL bar.
 5. You will automatically be redirected to the **Security Dashboard**. The background Playwright instance will load the page, run its localized Threat detection, and the dashboard will update its **Risk Score** and **Threat Cards** in real-time (no page reload necessary).
 6. Test against `benign_shopping.html` to confirm that the DOM Risk stays at `0` for safe pages.
+
+---
+
+## Phase 3: Guard LLM & Policy Engine
+**Status:** ✅ COMPLETED
+
+### 📌 What Was Completed
+- Built the **Guard LLM** (`guard_llm.py`) using Google Gemini (`gemini-2.0-flash`) to reason about page safety relative to the agent's goal. The LLM receives sanitized DOM summaries (never raw user data) and returns a structured verdict: classification (safe/suspicious/malicious), explanation, confidence, goal alignment, and recommended action.
+- Built the **Policy Engine** (`policy_engine.py`) that aggregates 3 risk signals using a weighted formula: `DOM_score × 0.4 + LLM_score × 0.4 + Heuristic_score × 0.2`. Applies configurable thresholds (0-39=ALLOW, 40-64=WARN, 65-84=REQUIRE_APPROVAL, 85+=BLOCK). Includes domain allowlist/blocklist for hard overrides.
+- Built the **Security Gate** (`security_gate.py`) — a single orchestrator that chains: Page Render → DOM Scan → Guard LLM → Policy Engine. Persists results to MongoDB and broadcasts to the dashboard via WebSocket.
+- Added `/api/evaluate` endpoint for full 3-layer security evaluation and `/api/hitl/respond` for Human-in-the-Loop approval/rejection.
+- Built the **HITL Approval Modal** (`HITLApproval.jsx`) — appears when policy returns REQUIRE_APPROVAL, shows URL, risk score, LLM explanation, threat list, and risk breakdown. Auto-blocks after 60 seconds.
+- Updated the **Dashboard** (`Dashboard.jsx`) with:
+  - Guard LLM verdict panel (classification badge, confidence, goal alignment)
+  - Policy decision panel (action badge, reason text)
+  - Real risk breakdown bars (DOM/LLM/Heuristic scores from policy engine)
+  - Clickable "Guard LLM report" tab for detailed verdict view
+  - Live latency and override count metrics
+- Updated WebSocket hook to handle `SECURITY_EVALUATION` and `HITL_RESOLVED` events
+- Wired Electron IPC `hitl-respond` handler to forward to `/api/hitl/respond` backend API
+
+### 🚀 How to Run the Servers
+*(Same as Phase 1)* Follow the startup commands from Phase 1 to boot the Backend, Frontend, and Electron Shell in three separate terminals.
+
+### 🧪 How to Test It Works
+1. Set your Gemini API key in `backend-python/.env`: `GEMINI_API_KEY=your_actual_key`
+2. Start the backend (`python -m uvicorn app.main:app --port 8000 --reload`)
+3. Test with a malicious page:
+   ```powershell
+   Invoke-WebRequest -UseBasicParsing -Uri "http://localhost:8000/api/evaluate" -Method POST -ContentType "application/json" -Body '{"url": "file:///D:/Hackathon/Secure_browser/ABS_HACKIITK/backend-python/tests/test_pages/phishing_login.html", "goal": "Browse safely"}'
+   ```
+   Expected: `classification` = malicious/suspicious, `action` = BLOCK/REQUIRE_APPROVAL
+4. Test with a safe page:
+   ```powershell
+   Invoke-WebRequest -UseBasicParsing -Uri "http://localhost:8000/api/evaluate" -Method POST -ContentType "application/json" -Body '{"url": "file:///D:/Hackathon/Secure_browser/ABS_HACKIITK/backend-python/tests/test_pages/benign_shopping.html", "goal": "Buy a laptop"}'
+   ```
+   Expected: `classification` = safe, `action` = ALLOW
+5. Test HITL endpoint: `POST /api/hitl/respond` with `{"requestId": "test", "approved": true}` → `{"approved": true}`
+6. Open the Dashboard and verify Guard LLM verdict panel, policy decision, and risk breakdown appear after an evaluation.
+
+### ⏭️ Next Steps (Phase 4)
+Phase 4: Sandboxing — Implement the sandboxed browser context with strict capability restrictions.

@@ -173,12 +173,13 @@ class DOMScanner:
                     confidence = 0.95
                     desc = f"Hidden content via {hidden_reason}. Contains prompt injection! Text: '{text[:200]}'"
                 else:
-                    # Flag hidden text that looks like it could be instructions
-                    # Short common UI elements (< 20 chars) are ignored
-                    if len(text) > 20:
-                        severity = "high"
-                        confidence = 0.7
-                        desc = f"Hidden content via {hidden_reason}. May conceal instructions. Text: '{text[:200]}'"
+                    # Real websites legitimately use display:none, aria-hidden, etc.
+                    # for dropdowns, accessibility, responsive menus, etc.
+                    # Only flag if the hidden text is suspiciously long (likely concealing instructions)
+                    if len(text) > 200:
+                        severity = "medium"
+                        confidence = 0.4
+                        desc = f"Large hidden content via {hidden_reason}. May conceal instructions. Text: '{text[:200]}'"
                     else:
                         continue
 

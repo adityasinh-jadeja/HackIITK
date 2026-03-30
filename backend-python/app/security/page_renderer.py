@@ -34,11 +34,11 @@ def _render_sync(url: str) -> dict:
 
         try:
             is_local = url.startswith("file://")
-            wait_cond = "load" if is_local else "networkidle"
-            timeout_ms = 10000 if is_local else 30000
+            wait_cond = "load" if is_local else "domcontentloaded"
+            timeout_ms = 10000 if is_local else 15000
 
             response = page.goto(url, wait_until=wait_cond, timeout=timeout_ms)
-            page.wait_for_timeout(1000)
+            page.wait_for_timeout(500)
 
             html = page.content()
             title = page.title()

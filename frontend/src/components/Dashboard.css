@@ -419,3 +419,140 @@ body, html {
     font-size: 0.85rem;
 }
 .sb-row span:first-child { color: var(--text-secondary); }
+
+/* RISK PILL VARIANTS */
+.risk-pill.safe {
+    color: var(--color-green);
+    border: 1px solid var(--color-green);
+    background-color: rgba(74, 222, 128, 0.1);
+}
+.risk-pill.danger {
+    color: var(--color-red);
+    border: 1px solid var(--color-red);
+    background-color: rgba(239, 68, 68, 0.1);
+}
+.risk-pill.critical {
+    color: var(--color-red);
+    background-color: rgba(239, 68, 68, 0.15);
+    border: 1px solid var(--color-red);
+}
+.risk-pill.high {
+    color: var(--color-orange);
+    background-color: rgba(249, 115, 22, 0.15);
+    border: 1px solid var(--color-orange);
+}
+.risk-pill.medium {
+    color: var(--color-yellow);
+    background-color: rgba(234, 179, 8, 0.15);
+    border: 1px solid var(--color-yellow);
+}
+
+.status-dot.red { background-color: var(--color-red); }
+
+/* GUARD LLM REPORT TAB */
+.guard-llm-report {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    padding: 1rem 0;
+}
+
+.verdict-header-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.verdict-badge {
+    padding: 0.4rem 1.2rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+}
+
+.verdict-green {
+    background: rgba(74, 222, 128, 0.15);
+    color: var(--color-green);
+    border: 1px solid rgba(74, 222, 128, 0.3);
+}
+
+.verdict-yellow {
+    background: rgba(234, 179, 8, 0.15);
+    color: var(--color-yellow);
+    border: 1px solid rgba(234, 179, 8, 0.3);
+}
+
+.verdict-red {
+    background: rgba(239, 68, 68, 0.15);
+    color: var(--color-red);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.verdict-blue {
+    background: rgba(59, 130, 246, 0.15);
+    color: var(--color-blue);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.verdict-confidence {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.verdict-explanation-card {
+    background: var(--bg-panel);
+    border-radius: var(--border-radius);
+    padding: 1.25rem;
+    border-left: 3px solid var(--color-blue);
+}
+
+.verdict-explanation-card h4 {
+    margin: 0 0 0.5rem 0;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.verdict-explanation-card p {
+    margin: 0;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    color: var(--text-primary);
+}
+
+.verdict-metrics-row {
+    display: flex;
+    gap: 1rem;
+}
+
+.verdict-metric {
+    flex: 1;
+    background: var(--bg-panel);
+    border-radius: var(--border-radius);
+    padding: 1rem;
+    text-align: center;
+}
+
+.verdict-metric-value {
+    display: block;
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.verdict-metric-label {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-top: 0.3rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+/* POLICY RELATED */
+.approval-status.pending {
+    background-color: rgba(249, 115, 22, 0.1);
+    color: var(--color-orange);
+}

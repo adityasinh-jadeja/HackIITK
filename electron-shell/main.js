@@ -120,6 +120,15 @@ function setupIPCHandlers() {
 
   ipcMain.handle("hitl-respond", async (_event, { requestId, approved }) => {
     console.log("[main] HITL respond:", requestId, approved);
+    try {
+      await fetch('http://localhost:8000/api/hitl/respond', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId, approved })
+      });
+    } catch (err) {
+      console.error("[main] Failed to send HITL response:", err.message);
+    }
     return true;
   });
 }

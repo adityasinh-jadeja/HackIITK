@@ -99,6 +99,42 @@ async def scan_url(body: dict):
     
     return report.model_dump()
 
+# --- PHASE 3: Guard LLM + Policy Engine Endpoints ---
+from app.security.security_gate import SecurityGate
+
+security_gate = SecurityGate()
+
+@app.post("/api/evaluate")
+async def evaluate_url(body: dict):
+    """Full 3-layer security evaluation of a URL."""
+    url = body.get("url")
+    goal = body.get("goal", "General browsing")
+    if not url:
+        return {"error": "No URL provided"}, 400
+    result = await security_gate.evaluate_url(url, goal)
+    
+    # Only return threats when the policy action is not ALLOW
+    policy_action = result["policy_decision"].action
+    threats = []
+    if policy_action in ("BLOCK", "REQUIRE_APPROVAL", "WARN"):
+        threats = [t.model_dump() for t in result["threat_report"].threats]
+    
+    return {
+        "threats": threats,
+        "llm_verdict": result["llm_verdict"].model_dump(),
+        "policy_decision": result["policy_decision"].model_dump(),
+        "latency_ms": result["total_latency_ms"],
+        "request_id": result["request_id"],
+    }
+
+@app.post("/api/hitl/respond")
+async def hitl_respond(body: dict):
+    """Submit Human-in-the-Loop response."""
+    request_id = body.get("requestId")
+    approved = body.get("approved", False)
+    result = await security_gate.handle_hitl_response(request_id, approved)
+    return {"approved": result}
+
 @app.websocket("/ws/dashboard")
 async def dashboard_ws(websocket: WebSocket):
     await ws_manager.connect(websocket)

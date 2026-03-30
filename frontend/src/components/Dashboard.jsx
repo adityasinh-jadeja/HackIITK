@@ -1,26 +1,30 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useWebSocket } from '../hooks/useWebSocket';
+import HITLApproval from './HITLApproval';
 import './Dashboard.css';
 
 const Dashboard = () => {
     const navigate = useNavigate();
     const location = useLocation();
-    const { connected, dashboardData: liveData } = useWebSocket();
+    const { connected, dashboardData: liveData, hitlRequest, respondToHitl, clearState } = useWebSocket();
     const [localScanning, setLocalScanning] = useState(false);
+    const [activeTab, setActiveTab] = useState('preview');
 
     useEffect(() => {
         if (location.state?.triggerScanUrl) {
+            // Clear previous scan data immediately so old results don't persist
+            clearState();
             setLocalScanning(true);
             const triggerUrl = location.state.triggerScanUrl;
             
             // Clear the location state so it doesn't re-trigger on remount
             window.history.replaceState({}, document.title)
 
-            fetch('http://localhost:8000/api/scan', {
+            fetch('http://localhost:8000/api/evaluate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url: triggerUrl })
+                body: JSON.stringify({ url: triggerUrl, goal: 'General browsing' })
             }).then(() => {
                 setLocalScanning(false);
             }).catch(err => {
@@ -28,7 +32,7 @@ const Dashboard = () => {
                 setLocalScanning(false);
             });
         }
-    }, [location.state]);
+    }, [location.state, clearState]);
 
     // Fallback data when initial load happens or disconnected
     const data = liveData || {
@@ -43,24 +47,16 @@ const Dashboard = () => {
             latency: 0.0
         },
         threats: [],
-        riskBreakdown: {
-            promptInjection: 0,
-            domAnomalies: 0,
-            networkAnomaly: 0,
-            uiDeception: 0,
-            goalAlignment: 100
-        },
-        llmExplanation: "System initialized. Sandbox isolated. Awaiting navigation or agent instruction."
+        llmVerdict: null,
+        policyDecision: null,
     };
 
     const globalRisk = data.overallRisk || 0;
-    // In Phase 1, dashboardData from WS gives us basic info.
-    // For missing properties (like riskBreakdown), we provide defaults.
-    const riskBreakdown = data.riskBreakdown || {
-        promptInjection: 0, domAnomalies: 0, networkAnomaly: 0, uiDeception: 0, goalAlignment: 100
-    };
-    const sessionMetrics = data.metrics || { blocked: 0, allowed: 0 };
+    const sessionMetrics = data.metrics || { blocked: 0, allowed: 0, overrides: 0, latency: 0 };
     const threats = data.threats || [];
+    const llmVerdict = data.llmVerdict || null;
+    const policyDecision = data.policyDecision || null;
+    const policyAction = policyDecision?.action || data.action || (globalRisk > 65 ? 'REQUIRE_APPROVAL' : globalRisk > 40 ? 'WARN' : 'ALLOW');
 
     const closeDashboard = () => {
         if (window.electronAPI) {
@@ -69,8 +65,32 @@ const Dashboard = () => {
         navigate('/');
     };
 
+    const handleHitlRespond = useCallback((requestId, approved) => {
+        respondToHitl(requestId, approved);
+    }, [respondToHitl]);
+
+    // Classification badge color
+    const classificationColor = (cls) => {
+        if (cls === 'safe') return 'green';
+        if (cls === 'suspicious') return 'yellow';
+        if (cls === 'malicious') return 'red';
+        return 'blue';
+    };
+
+    // Policy action badge color
+    const actionColor = (action) => {
+        if (action === 'ALLOW') return 'green';
+        if (action === 'WARN') return 'yellow';
+        if (action === 'REQUIRE_APPROVAL') return 'orange';
+        if (action === 'BLOCK') return 'red';
+        return 'blue';
+    };
+
     return (
         <div className="dashboard-layout">
+            {/* HITL Approval Modal */}
+            <HITLApproval hitlRequest={hitlRequest} onRespond={handleHitlRespond} />
+
             {/* TOP BAR */}
             <header className="dash-topbar">
                 <div className="dash-logo">
@@ -83,8 +103,8 @@ const Dashboard = () => {
                 </div>
 
                 <div className="dash-top-actions">
-                    <div className={`risk-pill ${globalRisk > 40 ? 'warning' : globalRisk > 70 ? 'danger' : 'safe'}`}>
-                        Risk: {globalRisk} / 100
+                    <div className={`risk-pill ${globalRisk >= 85 ? 'danger' : globalRisk >= 40 ? 'warning' : 'safe'}`}>
+                        Risk: {Math.round(globalRisk)} / 100
                     </div>
                     <button className="btn-next" onClick={closeDashboard}>Return to Session</button>
                 </div>
@@ -112,21 +132,33 @@ const Dashboard = () => {
                         <div className="goal-card">
                             <div className="goal-status-text">{data.agentStatus === 'idle' ? 'Idle' : 'Task in progress'}</div>
                             <h4 className="goal-title">{data.currentGoal}</h4>
-                            <div className="goal-step">{data.agentStatus}</div>
+                            <div className="goal-step">{
+                                data.agentStatus === 'rendering' ? '🌐 Rendering page...' :
+                                data.agentStatus === 'scanning' ? '🔍 DOM Scanning...' :
+                                data.agentStatus === 'llm_analysis' ? '🤖 Guard LLM analyzing...' :
+                                data.agentStatus === 'evaluation_complete' ? '✅ Evaluation complete' :
+                                data.agentStatus
+                            }</div>
                             <div className="progress-bar-bg">
-                                <div className="progress-bar-fill green-fill" style={{width: data.agentStatus === 'idle' ? '0%' : '50%'}}></div>
+                                <div className="progress-bar-fill green-fill" style={{width: 
+                                    data.agentStatus === 'rendering' ? '25%' :
+                                    data.agentStatus === 'scanning' ? '50%' :
+                                    data.agentStatus === 'llm_analysis' ? '75%' :
+                                    data.agentStatus === 'evaluation_complete' ? '100%' :
+                                    '0%'
+                                }}></div>
                             </div>
                         </div>
                     </section>
 
+                    {/* RISK BREAKDOWN — Phase 3 enhanced */}
                     <section className="dash-section">
                         <h3 className="section-title">RISK BREAKDOWN</h3>
                         <div className="risk-list">
-                            <RiskItem label="Prompt injection" value={riskBreakdown.promptInjection} colorClass="red" />
-                            <RiskItem label="DOM anomalies" value={riskBreakdown.domAnomalies} colorClass="orange" />
-                            <RiskItem label="Network anomaly" value={riskBreakdown.networkAnomaly} colorClass="blue" />
-                            <RiskItem label="UI deception" value={riskBreakdown.uiDeception} colorClass="orange" />
-                            <RiskItem label="Goal alignment" value={riskBreakdown.goalAlignment} colorClass="green" />
+                            <RiskItem label="DOM Scanner" value={policyDecision?.dom_score || 0} colorClass="red" />
+                            <RiskItem label="Guard LLM" value={policyDecision?.llm_score || 0} colorClass="orange" />
+                            <RiskItem label="Heuristic" value={policyDecision?.heuristic_score || 0} colorClass="blue" />
+                            <RiskItem label="Goal Alignment" value={llmVerdict ? Math.round(llmVerdict.goal_alignment * 100) : 100} colorClass="green" />
                         </div>
                     </section>
 
@@ -141,12 +173,13 @@ const Dashboard = () => {
                                 <span className="metric-val green-text">{sessionMetrics.allowed}</span>
                                 <span className="metric-label">allowed</span>
                             </div>
-                            {/* Dummy boxes to match design */}
                             <div className="metric-box">
-                                <span className="metric-val text-yellow">{threats.length}</span>
+                                <span className="metric-val text-yellow">{sessionMetrics.overrides || 0}</span>
+                                <span className="metric-label">overrides</span>
                             </div>
                             <div className="metric-box">
-                                <span className="metric-val text-white">{globalRisk > 0 ? '0.91' : '0.00'}</span>
+                                <span className="metric-val text-white">{data.latency ? `${Math.round(data.latency)}ms` : '—'}</span>
+                                <span className="metric-label">latency</span>
                             </div>
                         </div>
                     </section>
@@ -155,53 +188,110 @@ const Dashboard = () => {
                 {/* CENTER CONTENT */}
                 <main className="dash-center">
                     <div className="center-tabs">
-                        <div className="tab active">Page<br/>preview</div>
-                        <div className="tab">Session<br/>timeline</div>
-                        <div className="tab">Network<br/>log</div>
-                        <div className="tab">Guard<br/>LLM report</div>
+                        <div className={`tab ${activeTab === 'preview' ? 'active' : ''}`} onClick={() => setActiveTab('preview')}>Page<br/>preview</div>
+                        <div className={`tab ${activeTab === 'timeline' ? 'active' : ''}`} onClick={() => setActiveTab('timeline')}>Session<br/>timeline</div>
+                        <div className={`tab ${activeTab === 'network' ? 'active' : ''}`} onClick={() => setActiveTab('network')}>Network<br/>log</div>
+                        <div className={`tab ${activeTab === 'guard' ? 'active' : ''}`} onClick={() => setActiveTab('guard')}>Guard<br/>LLM report</div>
                     </div>
 
-                    <div className="browser-preview-frame">
-                        <div className="preview-header">
-                            <div className="mac-dots">
-                                <span className="dot red"></span>
-                                <span className="dot yellow"></span>
-                                <span className="dot green"></span>
+                    {activeTab === 'preview' && (
+                        <div className="browser-preview-frame">
+                            <div className="preview-header">
+                                <div className="mac-dots">
+                                    <span className="dot red"></span>
+                                    <span className="dot yellow"></span>
+                                    <span className="dot green"></span>
+                                </div>
+                                <div className="preview-url">{(data.url || '').replace(/^https?:\/\//, '')}</div>
                             </div>
-                            <div className="preview-url">{(data.url || '').replace(/^https?:\/\//, '')}</div>
-                        </div>
-                        <div className="preview-body">
-                            {threats.length > 0 ? (
-                                <>
-                                    <div className="preview-warning-outline">
-                                        <span className="warning-label">{threats[0].severity || threats[0].level || 'CRITICAL'}: Page Flagged</span>
-                                        <h2>Security Intercept</h2>
+                            <div className="preview-body">
+                                {localScanning ? (
+                                    <div style={{textAlign: 'center', color: 'var(--text-secondary)', padding: '2rem'}}>
+                                        <div className="scanning-spinner">⏳</div>
+                                        <h3>Scanning...</h3>
+                                        <p>Running security evaluation through DOM Scanner → Guard LLM → Policy Engine</p>
                                     </div>
-                                    <p className="preview-desc">The active session has encountered potentially unsafe elements dynamically during Agent execution.</p>
-                                    
-                                    <div className="preview-critical-box">
-                                        <span className="critical-label">CRITICAL: {threats[0].type || threats[0].title}</span>
-                                        <div className="critical-line"></div>
+                                ) : policyAction === 'ALLOW' || policyAction === 'WARN' ? (
+                                    <div style={{textAlign: 'center', color: 'var(--text-secondary)', padding: '2rem'}}>
+                                        <ShieldIcon style={{opacity: 0.3, width: '48px', height: '48px', marginBottom: '1rem'}} />
+                                        <h3 style={{color: policyAction === 'ALLOW' ? 'var(--color-green)' : 'var(--color-yellow)'}}>
+                                            {policyAction === 'ALLOW' ? '✅ Page Approved' : '⚠️ Proceed with Caution'}
+                                        </h3>
+                                        <p>{policyDecision?.reason || 'No active threats that require intervention.'}</p>
+                                    </div>
+                                ) : threats.length > 0 ? (
+                                    <>
+                                        <div className="preview-warning-outline">
+                                            <span className="warning-label">{threats[0].severity || threats[0].level || 'CRITICAL'}: Page Flagged</span>
+                                            <h2>Security Intercept</h2>
+                                        </div>
+                                        <p className="preview-desc">The active session has encountered potentially unsafe elements dynamically during Agent execution.</p>
+                                        
+                                        <div className="preview-critical-box">
+                                            <span className="critical-label">CRITICAL: {threats[0].type || threats[0].title}</span>
+                                            <div className="critical-line"></div>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div style={{textAlign: 'center', color: 'var(--text-secondary)', padding: '2rem'}}>
+                                        <ShieldIcon style={{opacity: 0.3, width: '48px', height: '48px', marginBottom: '1rem'}} />
+                                        <h3>Page Currently Safe</h3>
+                                        <p>No active threats detected on the current DOM.</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'guard' && (
+                        <div className="guard-llm-report">
+                            {llmVerdict ? (
+                                <>
+                                    <div className="verdict-header-row">
+                                        <span className={`verdict-badge verdict-${classificationColor(llmVerdict.classification)}`}>
+                                            {llmVerdict.classification?.toUpperCase()}
+                                        </span>
+                                        <span className="verdict-confidence">
+                                            Confidence: {Math.round(llmVerdict.confidence * 100)}%
+                                        </span>
+                                    </div>
+                                    <div className="verdict-explanation-card">
+                                        <h4>LLM Explanation</h4>
+                                        <p>{llmVerdict.explanation}</p>
+                                    </div>
+                                    <div className="verdict-metrics-row">
+                                        <div className="verdict-metric">
+                                            <span className="verdict-metric-value">{Math.round(llmVerdict.goal_alignment * 100)}%</span>
+                                            <span className="verdict-metric-label">Goal Alignment</span>
+                                        </div>
+                                        <div className="verdict-metric">
+                                            <span className="verdict-metric-value">{llmVerdict.recommended_action?.toUpperCase()}</span>
+                                            <span className="verdict-metric-label">Recommended Action</span>
+                                        </div>
                                     </div>
                                 </>
                             ) : (
-                                <div style={{textAlign: 'center', color: 'var(--text-secondary)', padding: '2rem'}}>
-                                    <ShieldIcon style={{opacity: 0.3, width: '48px', height: '48px', marginBottom: '1rem'}} />
-                                    <h3>Page Currently Safe</h3>
-                                    <p>No active threats detected on the current DOM.</p>
+                                <div style={{textAlign: 'center', color: 'var(--text-secondary)', padding: '3rem'}}>
+                                    <p>No Guard LLM report available yet. Trigger a security evaluation to see results.</p>
                                 </div>
                             )}
                         </div>
-                    </div>
+                    )}
+
+                    {(activeTab === 'timeline' || activeTab === 'network') && (
+                        <div style={{textAlign: 'center', color: 'var(--text-secondary)', padding: '3rem'}}>
+                            <p>Coming in Phase 5 — Agent pipeline will populate this view.</p>
+                        </div>
+                    )}
 
                     <div className="center-bottom-stats">
                         <div className="risk-score-display">
-                            <span className={`big-score ${globalRisk > 40 ? 'orange-text' : 'green-text'}`}>{globalRisk}</span>
+                            <span className={`big-score ${globalRisk >= 65 ? 'red-text' : globalRisk >= 40 ? 'orange-text' : 'green-text'}`}>{Math.round(globalRisk)}</span>
                             <span className="score-label">overall risk score</span>
                         </div>
                         <div className="policy-decision">
-                            <span className={`decision-text ${globalRisk > 40 ? 'warning-text' : 'green-text'}`}>
-                                {globalRisk > 40 ? 'CONFIRM REQUIRED' : 'ALLOW'}
+                            <span className={`decision-text ${actionColor(policyAction)}-text`}>
+                                {policyAction}
                             </span>
                             <span className="score-label">policy decision</span>
                         </div>
@@ -209,7 +299,7 @@ const Dashboard = () => {
 
                     <div className="llm-explanation">
                         <h3 className="section-title">GUARD LLM EXPLANATION</h3>
-                        <p>{data.llmExplanation || "System initialized. Sandbox isolated. Awaiting navigation or agent instruction."}</p>
+                        <p>{llmVerdict?.explanation || "System initialized. Sandbox isolated. Awaiting navigation or agent instruction."}</p>
                         <div className="scroll-arrow-container">
                             <div className="scroll-arrow">↓</div>
                         </div>
@@ -219,10 +309,21 @@ const Dashboard = () => {
                 {/* RIGHT SIDEBAR */}
                 <aside className="dash-sidebar-right">
                     <section className="dash-section">
-                        <h3 className="section-title">APPROVAL QUEUE</h3>
-                        <div className={`approval-status ${globalRisk > 40 ? 'rejected' : 'approved'}`} style={globalRisk <= 40 ? {backgroundColor: 'rgba(74, 222, 128, 0.1)', color: 'var(--color-green)'} : {}}>
-                            {globalRisk > 40 ? 'Action blocked by operator' : 'All actions permitted'}
+                        <h3 className="section-title">POLICY DECISION</h3>
+                        <div className={`approval-status ${policyAction === 'ALLOW' ? 'approved' : policyAction === 'BLOCK' ? 'rejected' : 'pending'}`}
+                             style={policyAction === 'ALLOW' ? {backgroundColor: 'rgba(74, 222, 128, 0.1)', color: 'var(--color-green)'} : 
+                                    policyAction === 'WARN' ? {backgroundColor: 'rgba(234, 179, 8, 0.1)', color: 'var(--color-yellow)'} :
+                                    policyAction === 'REQUIRE_APPROVAL' ? {backgroundColor: 'rgba(249, 115, 22, 0.1)', color: 'var(--color-orange)'} : {}}>
+                            {policyAction === 'ALLOW' ? '✅ All actions permitted' :
+                             policyAction === 'WARN' ? '⚠️ Proceed with caution' :
+                             policyAction === 'REQUIRE_APPROVAL' ? '🔶 Awaiting operator approval' :
+                             '❌ Action blocked'}
                         </div>
+                        {policyDecision && (
+                            <div className="policy-reason-text" style={{marginTop: '0.75rem', fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: '1.4'}}>
+                                {policyDecision.reason}
+                            </div>
+                        )}
                     </section>
 
                     <section className="dash-section">
@@ -262,10 +363,10 @@ const RiskItem = ({ label, value, colorClass }) => (
     <div className="risk-item">
         <div className="risk-item-header">
             <span>{label}</span>
-            <span>{value}</span>
+            <span>{Math.round(value)}</span>
         </div>
         <div className="progress-bar-bg small">
-            <div className={`progress-bar-fill ${colorClass}-fill`} style={{ width: `${value}%` }}></div>
+            <div className={`progress-bar-fill ${colorClass}-fill`} style={{ width: `${Math.min(100, value)}%` }}></div>
         </div>
     </div>
 );
