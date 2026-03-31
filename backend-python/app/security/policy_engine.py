@@ -82,6 +82,13 @@ class PolicyEngine:
 
         aggregate = (dom_score * 0.4) + (llm_score * 0.4) + (heuristic_score * 0.2)
 
+        # Smart Degradation: If LLM failed completely (rate limit/timeout)
+        # but the local DOM scanner and heuristics are perfectly clean, allow navigation
+        if llm_verdict.explanation == "Guard LLM analysis failed." and dom_score == 0.0 and heuristic_score < 40.0:
+            aggregate = 0.0
+            llm_verdict.explanation = "LLM unavailable. Auto-allowed based on perfectly clean DOM scan."
+            llm_verdict.classification = "safe"
+
         # Apply thresholds
         if aggregate >= settings.RISK_THRESHOLD_BLOCK:
             action = "BLOCK"

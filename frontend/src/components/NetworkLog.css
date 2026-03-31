@@ -1,0 +1,267 @@
+.network-log-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 0.5rem 0;
+    height: 100%;
+}
+
+/* Summary Stats Bar */
+.network-stats-bar {
+    display: flex;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    background: var(--bg-panel);
+    border-radius: var(--border-radius);
+    border: 1px solid var(--border-color);
+}
+
+.net-stat {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.2rem;
+}
+
+.net-stat-value {
+    font-size: 1.3rem;
+    font-weight: 700;
+}
+
+.net-stat-label {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+/* Filter Bar */
+.network-filters {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.net-filter-btn {
+    padding: 0.35rem 0.85rem;
+    border: 1px solid var(--border-color);
+    background: transparent;
+    color: var(--text-secondary);
+    border-radius: 20px;
+    font-size: 0.78rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.net-filter-btn:hover {
+    border-color: var(--color-blue);
+    color: var(--text-primary);
+}
+
+.net-filter-btn.active {
+    background: rgba(59, 130, 246, 0.15);
+    border-color: var(--color-blue);
+    color: var(--color-blue);
+    font-weight: 600;
+}
+
+/* Request List */
+.network-request-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    overflow-y: auto;
+    max-height: calc(100vh - 400px);
+    padding-right: 0.25rem;
+}
+
+.network-request-list::-webkit-scrollbar {
+    width: 4px;
+}
+
+.network-request-list::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 2px;
+}
+
+/* Individual Request Row */
+.net-request-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.55rem 0.75rem;
+    background: var(--bg-panel);
+    border-radius: 6px;
+    font-size: 0.8rem;
+    border-left: 3px solid transparent;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.net-request-row:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.net-request-row.allowed {
+    border-left-color: var(--color-green);
+}
+
+.net-request-row.blocked {
+    border-left-color: var(--color-red);
+    background: rgba(239, 68, 68, 0.05);
+}
+
+/* Action Icon */
+.net-action-icon {
+    font-size: 0.9rem;
+    width: 20px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+/* Method Badge */
+.net-method-badge {
+    padding: 0.15rem 0.45rem;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    flex-shrink: 0;
+    min-width: 36px;
+    text-align: center;
+}
+
+.net-method-badge.get {
+    background: rgba(59, 130, 246, 0.15);
+    color: var(--color-blue);
+}
+
+.net-method-badge.post {
+    background: rgba(249, 115, 22, 0.15);
+    color: var(--color-orange);
+}
+
+.net-method-badge.put {
+    background: rgba(234, 179, 8, 0.15);
+    color: var(--color-yellow);
+}
+
+.net-method-badge.delete {
+    background: rgba(239, 68, 68, 0.15);
+    color: var(--color-red);
+}
+
+/* URL */
+.net-url {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-primary);
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.75rem;
+}
+
+.net-url.blocked-url {
+    color: var(--color-red);
+    text-decoration: line-through;
+    opacity: 0.8;
+}
+
+/* Resource Type */
+.net-resource-type {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    flex-shrink: 0;
+    min-width: 55px;
+    text-align: right;
+}
+
+/* Timestamp */
+.net-timestamp {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    flex-shrink: 0;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+}
+
+/* Expandable Block Reason */
+.net-block-reason {
+    padding: 0.5rem 0.75rem;
+    padding-left: 2.5rem;
+    background: rgba(239, 68, 68, 0.06);
+    border-radius: 0 0 6px 6px;
+    margin-top: -0.35rem;
+    font-size: 0.75rem;
+    color: var(--color-red);
+    border-left: 3px solid var(--color-red);
+    animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Empty State */
+.network-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem;
+    color: var(--text-secondary);
+    gap: 0.75rem;
+}
+
+.network-empty-icon {
+    font-size: 2rem;
+    opacity: 0.4;
+}
+
+/* Blocked count badge in stats */
+.block-rate-badge {
+    padding: 0.15rem 0.5rem;
+    border-radius: 10px;
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+
+.block-rate-badge.safe {
+    background: rgba(74, 222, 128, 0.12);
+    color: var(--color-green);
+}
+
+.block-rate-badge.warning {
+    background: rgba(234, 179, 8, 0.12);
+    color: var(--color-yellow);
+}
+
+.block-rate-badge.danger {
+    background: rgba(239, 68, 68, 0.12);
+    color: var(--color-red);
+}
+
+/* Pulse animation for live indicator */
+.net-live-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--color-green);
+    display: inline-block;
+    margin-right: 0.4rem;
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}

@@ -129,6 +129,22 @@ const BrowserUI = () => {
             <span className="dot"></span>
             <span className="label">{isBackendConnected ? 'Online' : 'Offline'}</span>
           </div>
+          {dashboardData?.sandboxed && (
+            <div className="sandbox-badge" style={{
+              padding: '0.25rem 0.6rem',
+              borderRadius: '12px',
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              background: 'rgba(74, 222, 128, 0.12)',
+              color: '#4ade80',
+              border: '1px solid rgba(74, 222, 128, 0.25)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.3rem',
+            }}>
+              🔒 Sandboxed
+            </div>
+          )}
           <div className={`risk-badge ${riskLevel.toLowerCase()}`}>
             <span>🛡️ {riskLevel}</span>
           </div>

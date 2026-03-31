@@ -17,11 +17,15 @@ The LLM NEVER sees raw user data or credentials. It only sees:
 
 import json
 import asyncio
-import google.generativeai as genai
+from typing import Optional
+from google import genai
+from google.genai import types
 from app.config import settings
 from app.models.schemas import GuardLLMVerdict, ThreatReport
 from bs4 import BeautifulSoup
 import re
+import httpx
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 genai.configure(api_key=settings.GEMINI_API_KEY)
 
@@ -64,14 +68,7 @@ Classification rules:
 Be conservative — when in doubt, classify as SUSPICIOUS rather than SAFE."""
 
     def __init__(self):
-        self.model = genai.GenerativeModel(
-            self.MODEL_NAME,
-            system_instruction=self.SYSTEM_PROMPT,
-            generation_config=genai.GenerationConfig(
-                response_mime_type="application/json",
-                temperature=0.1,  # Low temperature for consistent security decisions
-            ),
-        )
+        self.client = genai.Client(api_key=settings.GEMINI_API_KEY)
 
     async def analyze(self, goal: str, page_summary: str, threat_report: ThreatReport) -> GuardLLMVerdict:
         """
@@ -95,38 +92,64 @@ DOM Risk Score (automated): {threat_report.dom_risk_score:.1f}/100
 
 Analyze this page and provide your security verdict."""
 
-        try:
-            # 10-second timeout — don't hang on rate limits or slow responses
-            response = await asyncio.wait_for(
-                self.model.generate_content_async(prompt),
-                timeout=10.0
-            )
-            result = response.text
+        # Define the network call with resilient retries
+        @retry(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential(multiplier=1, min=2, max=8),
+            reraise=True
+        )
+        async def _call_llm():
+            if getattr(settings, "LLM_PROVIDER", "gemini").lower() == "ollama":
+                # Provider: OLLAMA (Local/Private GPU)
+                async with httpx.AsyncClient() as client:
+                    response = await client.post(
+                        f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/generate",
+                        json={
+                            "model": getattr(settings, "OLLAMA_MODEL", "llama3"),
+                            "prompt": prompt,
+                            "system": self.SYSTEM_PROMPT,
+                            "format": "json",
+                            "stream": False,
+                            "options": {"temperature": 0.1}
+                        },
+                        timeout=30.0
+                    )
+                    response.raise_for_status()
+                    return response.json().get("response", "{}")
+            else:
+                # Provider: GEMINI (Cloud API)
+                response = await asyncio.wait_for(
+                    self.client.aio.models.generate_content(
+                        model=self.MODEL_NAME,
+                        contents=prompt,
+                        config=types.GenerateContentConfig(
+                            system_instruction=self.SYSTEM_PROMPT,
+                            response_mime_type="application/json",
+                            temperature=0.1,
+                        )
+                    ),
+                    timeout=15.0
+                )
+                return response.text
 
+        try:
+            result = await _call_llm()
             verdict_data = json.loads(result)
 
             return GuardLLMVerdict(
-                classification=verdict_data["classification"],
-                explanation=verdict_data["explanation"],
-                confidence=float(verdict_data["confidence"]),
-                goal_alignment=float(verdict_data["goal_alignment"]),
-                recommended_action=verdict_data["recommended_action"],
-            )
-        except asyncio.TimeoutError:
-            return GuardLLMVerdict(
-                classification="suspicious",
-                explanation="Guard LLM timed out (>10s). Defaulting to suspicious for safety.",
-                confidence=0.5,
-                goal_alignment=0.5,
-                recommended_action="warn",
+                classification=verdict_data.get("classification", "suspicious"),
+                explanation=verdict_data.get("explanation", "No reasoning provided by LLM"),
+                confidence=float(verdict_data.get("confidence", 0.5)),
+                goal_alignment=float(verdict_data.get("goal_alignment", 0.5)),
+                recommended_action=verdict_data.get("recommended_action", "warn"),
             )
         except Exception as e:
-            # Fail-safe: if LLM fails, default to suspicious
-            error_msg = str(e)[:200]  # Truncate long error messages
+            # Drop to graceful degradation if the resilience wrapper fails completely
+            error_msg = str(e)[:200]
             return GuardLLMVerdict(
                 classification="suspicious",
-                explanation=f"Guard LLM analysis failed: {error_msg}. Defaulting to suspicious.",
-                confidence=0.5,
+                explanation="Guard LLM analysis failed.", # We check for this specific string in caching logic
+                confidence=0.1,
                 goal_alignment=0.5,
                 recommended_action="warn",
             )

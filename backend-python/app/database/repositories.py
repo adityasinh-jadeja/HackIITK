@@ -2,7 +2,7 @@
 CRUD operations for MongoDB collections.
 Collections: sessions, threats, policy_decisions, network_logs
 """
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from app.database.connection import get_db
 
 async def create_session(session_data: dict) -> str:
@@ -31,3 +31,32 @@ async def get_threats(session_id: str = None, limit: int = 100):
     query = {"session_id": session_id} if session_id else {}
     cursor = db.threats.find(query).sort("detected_at", -1).limit(limit)
     return await cursor.to_list(length=limit)
+
+async def get_cached_llm_verdict(url: str, goal: str, dom_risk_score: float):
+    """Retrieve a recent LLM verdict from the database to save API calls/GPU cycles."""
+    db = get_db()
+    # Consider cache valid for 1 hour
+    threshold = datetime.now(timezone.utc) - timedelta(hours=1)
+    
+    # We use dom_risk_score as a proxy for DOM structure changes.
+    # If the risk score is the same, the DOM threats are likely the same.
+    record = await db.llm_cache.find_one({
+        "url": url,
+        "goal": goal,
+        "dom_risk_score": dom_risk_score,
+        "cached_at": {"$gt": threshold}
+    })
+    return record
+
+async def cache_llm_verdict(url: str, goal: str, dom_risk_score: float, verdict_data: dict):
+    """Save an LLM verdict to the database."""
+    db = get_db()
+    document = {
+        "url": url,
+        "goal": goal,
+        "dom_risk_score": dom_risk_score,
+        "verdict": verdict_data,
+        "cached_at": datetime.now(timezone.utc)
+    }
+    await db.llm_cache.insert_one(document)
+

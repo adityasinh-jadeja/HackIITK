@@ -35,12 +35,39 @@ export function useWebSocket() {
         latency: msg.data.latency,
         requestId: msg.data.requestId,
         agentStatus: msg.data.agentStatus,
+        // Phase 4: Preserve sandbox/network data across evaluation
+        sandboxed: msg.data.sandboxed || false,
+        sessionId: msg.data.sessionId || null,
+        // Keep network data from previous NETWORK_ACTIVITY events
+        networkLog: prev?.networkLog || [],
+        networkStats: prev?.networkStats || {},
+        sandboxStatus: prev?.sandboxStatus || {},
       }));
 
       // Trigger HITL modal if REQUIRE_APPROVAL
       if (msg.data.action === 'REQUIRE_APPROVAL') {
         setHitlRequest(msg.data);
       }
+
+    } else if (msg.type === 'NETWORK_ACTIVITY') {
+      // Phase 4: Network activity from sandboxed browser
+      setDashboardData(prev => ({
+        ...prev,
+        networkLog: msg.data.network_log || [],
+        networkStats: msg.data.network_stats || {},
+      }));
+
+    } else if (msg.type === 'SANDBOX_STATUS') {
+      // Phase 4: Sandbox session status update
+      setDashboardData(prev => ({
+        ...prev,
+        sandboxStatus: {
+          sessionId: msg.data.session_id,
+          active: msg.data.active,
+          sessions: msg.data.sessions || [],
+          permissions: msg.data.permissions || {},
+        },
+      }));
 
     } else if (msg.type === 'HITL_RESOLVED') {
       setHitlRequest(null);

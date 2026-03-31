@@ -14,6 +14,11 @@ class Settings(BaseSettings):
     RISK_THRESHOLD_BLOCK: int = 85
     PLAYWRIGHT_HEADLESS: bool = True
     MAX_CONCURRENT_CONTEXTS: int = 5
+    
+    # Hybrid LLM Configuration
+    LLM_PROVIDER: str = "gemini"  # "gemini" or "ollama"
+    OLLAMA_BASE_URL: str = "http://localhost:11434"
+    OLLAMA_MODEL: str = "llama3"
 
     class Config:
         env_file = ".env"
