@@ -5,6 +5,7 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     GEMINI_API_KEY: str = ""
+    GROQ_API_KEY: str = ""
     MONGODB_URI: str = "mongodb://localhost:27017/secure_browser"
     PORT: int = 8000
     HOST: str = "0.0.0.0"
@@ -16,7 +17,7 @@ class Settings(BaseSettings):
     MAX_CONCURRENT_CONTEXTS: int = 5
     
     # Hybrid LLM Configuration
-    LLM_PROVIDER: str = "gemini"  # "gemini" or "ollama"
+    LLM_PROVIDER: str = "groq"  # "gemini", "ollama", or "groq"
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     OLLAMA_MODEL: str = "llama3"
 

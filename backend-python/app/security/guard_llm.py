@@ -18,16 +18,12 @@ The LLM NEVER sees raw user data or credentials. It only sees:
 import json
 import asyncio
 from typing import Optional
-from google import genai
-from google.genai import types
 from app.config import settings
 from app.models.schemas import GuardLLMVerdict, ThreatReport
+from app.security.llm_client import get_llm_client
 from bs4 import BeautifulSoup
 import re
-import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential
-
-genai.configure(api_key=settings.GEMINI_API_KEY)
 
 
 class GuardLLM:
@@ -68,7 +64,7 @@ Classification rules:
 Be conservative — when in doubt, classify as SUSPICIOUS rather than SAFE."""
 
     def __init__(self):
-        self.client = genai.Client(api_key=settings.GEMINI_API_KEY)
+        self.llm_client = get_llm_client()
 
     async def analyze(self, goal: str, page_summary: str, threat_report: ThreatReport) -> GuardLLMVerdict:
         """
@@ -99,38 +95,7 @@ Analyze this page and provide your security verdict."""
             reraise=True
         )
         async def _call_llm():
-            if getattr(settings, "LLM_PROVIDER", "gemini").lower() == "ollama":
-                # Provider: OLLAMA (Local/Private GPU)
-                async with httpx.AsyncClient() as client:
-                    response = await client.post(
-                        f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/generate",
-                        json={
-                            "model": getattr(settings, "OLLAMA_MODEL", "llama3"),
-                            "prompt": prompt,
-                            "system": self.SYSTEM_PROMPT,
-                            "format": "json",
-                            "stream": False,
-                            "options": {"temperature": 0.1}
-                        },
-                        timeout=30.0
-                    )
-                    response.raise_for_status()
-                    return response.json().get("response", "{}")
-            else:
-                # Provider: GEMINI (Cloud API)
-                response = await asyncio.wait_for(
-                    self.client.aio.models.generate_content(
-                        model=self.MODEL_NAME,
-                        contents=prompt,
-                        config=types.GenerateContentConfig(
-                            system_instruction=self.SYSTEM_PROMPT,
-                            response_mime_type="application/json",
-                            temperature=0.1,
-                        )
-                    ),
-                    timeout=15.0
-                )
-                return response.text
+            return await self.llm_client.generate_json(prompt, self.SYSTEM_PROMPT)
 
         try:
             result = await _call_llm()

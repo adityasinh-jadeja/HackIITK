@@ -191,5 +191,27 @@ Now that the DOM Scanner is independently functioning and reporting localized UI
 4. Change `OLLAMA_BASE_URL` to the IP or Ngrok URL of the college computer.
 5. The backend will instantly route all security evaluations to the local GPU.
 
+### ✅ Phase 4.6: LLM Provider Abstraction & Groq Default — COMPLETED
+
+**Objective:** Abstract the LLM logic to support multiple providers (Gemini, Groq, Ollama) cleanly, and set Groq's high-speed inference as the new default model.
+
+#### What Was Completed
+- Created `app/security/llm_client.py` abstracting `BaseLLMClient`, `GeminiClient`, `GroqClient`, and `OllamaClient`.
+- Decoupled `GuardLLM` from the `google-genai` pip package, shifting to the new client factory.
+- Changed default global configuration in `.env` and `app/config.py` to target provider **`groq`**.
+- Created an isolated script `test_llm_direct.py` to verify prompt injection and parsing without spinning up Uvicorn.
+
+#### How to Test the Guard LLM Directly
+You can run a standalone verification script that completely bypasses the HTTP layer and evaluates mock DOM structures:
+1. Ensure the virtual environment is enabled (`cd backend-python; .\venv\Scripts\activate`)
+2. Run `python test_llm_direct.py`
+3. Verify that the output shows `Testing with provider: GroqClient` and returns a deterministic JSON analysis:
+   ```json
+   Classification: malicious
+   Explanation: The page contains a login form that posts to an external suspicious domain 'evil.com' and the automated threat detection has flagged this as a high-risk phishing threat.
+   Confidence: 0.99
+   Recommended Action: block
+   ```
+
 ### ⏭️ Next Steps (Phase 5)
 Phase 5: Task Agent Pipeline — Implement the agentic browsing loop with task LLM, action planning, and multi-step workflows.
