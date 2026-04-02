@@ -38,6 +38,30 @@ class GeminiClient(BaseLLMClient):
         self.client = genai.Client(api_key=settings.GEMINI_API_KEY)
 
     async def generate_json(self, prompt: str, system_prompt: str) -> str:
+        max_retries = 4
+        for attempt in range(max_retries):
+            try:
+                response = await asyncio.wait_for(
+                    self.client.aio.models.generate_content(
+                        model=self.MODEL_NAME,
+                        contents=prompt,
+                        config=types.GenerateContentConfig(
+                            system_instruction=system_prompt,
+                            response_mime_type="application/json",
+                            temperature=0.1,
+                        )
+                    ),
+                    timeout=20.0
+                )
+                return response.text
+            except Exception as e:
+                if "429" in str(e) or "rate" in str(e).lower() or "quota" in str(e).lower() or "resource" in str(e).lower():
+                    wait_secs = 3 * (attempt + 1)  # 3, 6, 9, 12 seconds
+                    print(f"[GeminiClient] Rate limited, retrying in {wait_secs}s (attempt {attempt+1}/{max_retries})...")
+                    await asyncio.sleep(wait_secs)
+                    continue
+                raise
+        # Final attempt
         response = await asyncio.wait_for(
             self.client.aio.models.generate_content(
                 model=self.MODEL_NAME,
@@ -48,7 +72,7 @@ class GeminiClient(BaseLLMClient):
                     temperature=0.1,
                 )
             ),
-            timeout=15.0
+            timeout=20.0
         )
         return response.text
 
@@ -63,6 +87,30 @@ class GroqClient(BaseLLMClient):
         self.client = AsyncGroq(api_key=settings.GROQ_API_KEY)
 
     async def generate_json(self, prompt: str, system_prompt: str) -> str:
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                response = await asyncio.wait_for(
+                    self.client.chat.completions.create(
+                        model=self.MODEL_NAME,
+                        messages=[
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": prompt}
+                        ],
+                        temperature=0.1,
+                        response_format={"type": "json_object"}
+                    ),
+                    timeout=20.0
+                )
+                return response.choices[0].message.content
+            except Exception as e:
+                # Retry on rate limit (429) or transient errors
+                if "429" in str(e) or "rate" in str(e).lower():
+                    wait_secs = 2 ** (attempt + 1)  # 2, 4, 8 seconds
+                    await asyncio.sleep(wait_secs)
+                    continue
+                raise
+        # Final attempt without catching
         response = await asyncio.wait_for(
             self.client.chat.completions.create(
                 model=self.MODEL_NAME,
@@ -73,7 +121,7 @@ class GroqClient(BaseLLMClient):
                 temperature=0.1,
                 response_format={"type": "json_object"}
             ),
-            timeout=15.0
+            timeout=20.0
         )
         return response.choices[0].message.content
 

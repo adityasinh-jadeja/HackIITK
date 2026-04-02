@@ -9,16 +9,20 @@ if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.config import settings
 from app.database.connection import connect_db, close_db
 from app.websocket.handler import ws_manager
 
-# --- PHASE 4: Sandbox Manager ---
 from app.sandbox.browser_context import SandboxManager
+from app.security.security_gate import SecurityGate
+from app.agent.browser_agent import BrowserAgent
 
 sandbox = SandboxManager()
+security_gate = SecurityGate()
+agent = BrowserAgent(sandbox, security_gate)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -44,19 +48,49 @@ async def health():
 async def get_dashboard():
     return ws_manager.get_current_state()
 
+# Global to hold agent task
+agent_task = None
+
 @app.post("/api/agent/start")
 async def start_agent(body: dict):
+    global agent_task
     goal = body.get("goal")
     if not goal:
-        return {"error": "No goal provided"}, 400
-    # Phase 5 will implement the actual agent pipeline
+        return JSONResponse(content={"error": "No goal provided"}, status_code=400)
+        
+    if agent.is_running:
+        agent.stop()
+        if agent_task and not agent_task.done():
+            agent_task.cancel()
+    
+    # Needs a sandbox session
+    session_id = await sandbox.create_session()
+    
+    # Broadcast start
     await ws_manager.broadcast({"type": "AGENT_STARTED", "goal": goal})
-    return {"message": "Agent started", "goal": goal}
+    
+    # Spawn background task
+    loop = asyncio.get_running_loop()
+    agent_task = loop.create_task(agent.run_task(session_id, goal))
+    
+    return {"message": "Agent started", "goal": goal, "session_id": session_id}
 
 @app.post("/api/agent/stop")
 async def stop_agent():
+    global agent_task
+    agent.stop()
+    if agent_task and not agent_task.done():
+        agent_task.cancel()
     await ws_manager.broadcast({"type": "AGENT_STOPPED"})
     return {"message": "Agent stopped"}
+
+@app.post("/api/agent/clear")
+async def clear_agent_state():
+    # Only allow clear if agent is not actively running
+    if agent.is_running:
+        return JSONResponse(content={"error": "Cannot clear state while agent is running"}, status_code=400)
+    await ws_manager.broadcast({"type": "AGENT_CLEARED"})
+    return {"message": "Agent state cleared"}
 
 # --- PHASE 2: DOM Scanner Endpoint ---
 from app.security.dom_scanner import DOMScanner
@@ -69,7 +103,7 @@ scanner = DOMScanner()
 async def scan_url(body: dict):
     url = body.get("url")
     if not url:
-        return {"error": "No URL provided"}, 400
+        return JSONResponse(content={"error": "No URL provided"}, status_code=400)
     
     # Immediately clear the cached dashboard state
     await ws_manager.broadcast({
@@ -106,9 +140,7 @@ async def scan_url(body: dict):
     return report.model_dump()
 
 # --- PHASE 3: Guard LLM + Policy Engine Endpoints ---
-from app.security.security_gate import SecurityGate
-
-security_gate = SecurityGate()
+# (SecurityGate is already initialized at the top)
 
 @app.post("/api/evaluate")
 async def evaluate_url(body: dict):
@@ -116,7 +148,7 @@ async def evaluate_url(body: dict):
     url = body.get("url")
     goal = body.get("goal", "General browsing")
     if not url:
-        return {"error": "No URL provided"}, 400
+        return JSONResponse(content={"error": "No URL provided"}, status_code=400)
     
     # Phase 4: Auto-create sandbox for evaluation
     session_id = await sandbox.create_session()
@@ -199,7 +231,7 @@ async def sandbox_navigate(session_id: str, body: dict):
     """Navigate sandboxed session to a URL."""
     url = body.get("url")
     if not url:
-        return {"error": "No URL provided"}, 400
+        return JSONResponse(content={"error": "No URL provided"}, status_code=400)
     
     result = await sandbox.navigate(session_id, url)
     

@@ -1,0 +1,20 @@
+INFO:     Started server process [20764]
+INFO:     Waiting for application startup.
+ERROR:    Traceback (most recent call last):
+  File "D:\Hackathon\Secure_browser\ABS_HACKIITK\backend-python\venv\Lib\site-packages\starlette\routing.py", line 638, in lifespan
+    async with self.lifespan_context(app) as maybe_state:
+               ~~~~~~~~~~~~~~~~~~~~~^^^^^
+  File "C:\Python314\Lib\contextlib.py", line 214, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Hackathon\Secure_browser\ABS_HACKIITK\backend-python\app\main.py", line 28, in lifespan
+    await connect_db()
+  File "D:\Hackathon\Secure_browser\ABS_HACKIITK\backend-python\app\database\connection.py", line 14, in connect_db
+    print("\u2705 MongoDB connected")
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python314\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2705' in position 0: character maps to <undefined>
+
+ERROR:    Application startup failed. Exiting.

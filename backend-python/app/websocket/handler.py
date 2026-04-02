@@ -2,6 +2,7 @@
 WebSocket connection manager for real-time dashboard updates.
 """
 import json
+import asyncio
 from fastapi import WebSocket
 
 class WebSocketManager:
@@ -14,6 +15,8 @@ class WebSocketManager:
             "currentGoal": "Waiting for agent command...",
             "agentStatus": "idle",
         }
+        self.hitl_events: dict[str, asyncio.Event] = {}
+        self.hitl_results: dict[str, bool] = {}
 
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
@@ -29,23 +32,28 @@ class WebSocketManager:
         msg_type = data.get("type", "DASHBOARD_UPDATE")
 
         # Reset current state on new evaluation to prevent stale data
-        if msg_type == "SECURITY_EVALUATION":
+        if msg_type == "SECURITY_EVALUATION" or msg_type == "AGENT_CLEARED":
             self.current_state = {
                 "overallRisk": 0,
                 "metrics": self.current_state.get("metrics", {"blocked": 0, "allowed": 0, "overrides": 0, "latency": 0.0}),
                 "threats": [],
-                "currentGoal": self.current_state.get("currentGoal", "Waiting for agent command..."),
+                "currentGoal": "Waiting for agent command...",
                 "agentStatus": "idle",
             }
 
-        self.current_state.update(payload)
+        # LIVE_FRAME is high-frequency ephemeral data — skip state caching
+        if msg_type != "LIVE_FRAME":
+            self.current_state.update(payload)
         
         message = json.dumps({"type": msg_type, "data": payload})
+        disconnected = []
         for connection in self.active_connections:
             try:
                 await connection.send_text(message)
             except Exception:
-                self.disconnect(connection)
+                disconnected.append(connection)
+        for conn in disconnected:
+            self.disconnect(conn)
 
     async def handle_message(self, raw: str):
         data = json.loads(raw)
@@ -54,6 +62,12 @@ class WebSocketManager:
             request_id = data.get("requestId")
             approved = data.get("approved", False)
             action = "ALLOW" if approved else "BLOCK"
+            
+            # Resolve pending HITL wait if tracked
+            if request_id and request_id in self.hitl_events:
+                self.hitl_results[request_id] = approved
+                self.hitl_events[request_id].set()
+                
             await self.broadcast({
                 "type": "HITL_RESOLVED",
                 "data": {

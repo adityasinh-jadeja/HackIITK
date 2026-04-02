@@ -99,15 +99,15 @@ const HITLApproval = ({ hitlRequest, onRespond }) => {
                     {policyDecision && (
                         <div className="hitl-breakdown-row">
                             <div className="hitl-breakdown-item">
-                                <div className="breakdown-value">{Math.round(policyDecision.dom_score)}</div>
+                                <div className="breakdown-value">{Math.round(policyDecision?.dom_score || 0)}</div>
                                 <div className="breakdown-label">DOM</div>
                             </div>
                             <div className="hitl-breakdown-item">
-                                <div className="breakdown-value">{Math.round(policyDecision.llm_score)}</div>
+                                <div className="breakdown-value">{Math.round(policyDecision?.llm_score || 0)}</div>
                                 <div className="breakdown-label">LLM</div>
                             </div>
                             <div className="hitl-breakdown-item">
-                                <div className="breakdown-value">{Math.round(policyDecision.heuristic_score)}</div>
+                                <div className="breakdown-value">{Math.round(policyDecision?.heuristic_score || 0)}</div>
                                 <div className="breakdown-label">Heuristic</div>
                             </div>
                         </div>

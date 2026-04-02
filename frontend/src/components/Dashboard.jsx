@@ -59,7 +59,15 @@ const Dashboard = () => {
     const policyDecision = data.policyDecision || null;
     const policyAction = policyDecision?.action || data.action || (globalRisk > 65 ? 'REQUIRE_APPROVAL' : globalRisk > 40 ? 'WARN' : 'ALLOW');
 
-    const closeDashboard = () => {
+    const closeDashboard = async () => {
+        try {
+            // Attempt to auto-clear finished/stale state when leaving the dashboard.
+            // The backend safely ignores this if an agent is still actively running.
+            await fetch('http://localhost:8000/api/agent/clear', { method: 'POST' });
+        } catch (e) {
+            console.error("Failed to clear session:", e);
+        }
+
         if (window.electronAPI) {
              window.electronAPI.toggleDashboard(false);
         }
@@ -137,6 +145,10 @@ const Dashboard = () => {
                                 data.agentStatus === 'rendering' ? '🌐 Rendering page...' :
                                 data.agentStatus === 'scanning' ? '🔍 DOM Scanning...' :
                                 data.agentStatus === 'llm_analysis' ? '🤖 Guard LLM analyzing...' :
+                                data.agentStatus === 'planning' ? '🧠 Agent thinking...' :
+                                data.agentStatus === 'executing' ? '⚙️ Agent acting...' :
+                                data.agentStatus === 'navigating' ? '🌐 Agent navigating...' :
+                                data.agentStatus === 'finished' ? '✅ Agent complete' :
                                 data.agentStatus === 'evaluation_complete' ? '✅ Evaluation complete' :
                                 data.agentStatus
                             }</div>
@@ -145,7 +157,9 @@ const Dashboard = () => {
                                     data.agentStatus === 'rendering' ? '25%' :
                                     data.agentStatus === 'scanning' ? '50%' :
                                     data.agentStatus === 'llm_analysis' ? '75%' :
-                                    data.agentStatus === 'evaluation_complete' ? '100%' :
+                                    data.agentStatus === 'planning' ? '60%' :
+                                    data.agentStatus === 'executing' ? '80%' :
+                                    (data.agentStatus === 'finished' || data.agentStatus === 'evaluation_complete') ? '100%' :
                                     '0%'
                                 }}></div>
                             </div>
@@ -212,7 +226,7 @@ const Dashboard = () => {
                                         <h3>Scanning...</h3>
                                         <p>Running security evaluation through DOM Scanner → Guard LLM → Policy Engine</p>
                                     </div>
-                                ) : data.agentStatus === 'evaluation_complete' ? (
+                                ) : (data.policyDecision || data.llmVerdict || data.agentStatus === 'evaluation_complete') ? (
                                     <div style={{padding: '1.5rem'}}>
                                         {/* Scan Summary Card */}
                                         <div style={{display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem'}}>

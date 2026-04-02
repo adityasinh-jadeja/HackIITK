@@ -76,7 +76,11 @@ class NetworkProxy:
 
         # Check 2: Data exfiltration on POST requests
         if method == "POST":
-            post_data = request.post_data or ""
+            try:
+                post_data = request.post_data or ""
+            except Exception:
+                # Binary/gzip POST data can't be decoded as UTF-8 — skip inspection
+                post_data = ""
             if len(post_data) > 0:
                 for pattern in self.SENSITIVE_PATTERNS:
                     if re.search(pattern, post_data, re.IGNORECASE):

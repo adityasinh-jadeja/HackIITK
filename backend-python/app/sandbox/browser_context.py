@@ -84,6 +84,8 @@ class SandboxManager:
         self._permissions = {} # session_id → SandboxPermissions
         self.network_proxy = NetworkProxy()
         self._initialized = False
+        self._screencast_sessions = set()  # track active screencasts
+        self._cdp_sessions = {}  # session_id → CDPSession
         # Single thread executor — ALL Playwright operations go here
         self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="playwright")
 
@@ -242,6 +244,72 @@ class SandboxManager:
                 pass
         self.network_proxy.clear_log(session_id)
 
+    def _take_screenshot_sync(self, session_id):
+        """Take a PNG screenshot of the current sandbox page (sync)."""
+        page = self._pages.get(session_id)
+        if not page:
+            return None
+        try:
+            return page.screenshot(type="jpeg", quality=50)
+        except Exception:
+            return None
+
+    def _get_page_url_sync(self, session_id):
+        """Get the current page URL (sync)."""
+        page = self._pages.get(session_id)
+        if not page:
+            return "about:blank"
+        try:
+            return page.url
+        except Exception:
+            return "about:blank"
+
+    def _start_screencast_sync(self, session_id, callback):
+        """Start CDP screencast — pushes frames continuously (sync, playwright thread)."""
+        page = self._pages.get(session_id)
+        if not page:
+            return
+        try:
+            cdp = page.context.new_cdp_session(page)
+            self._cdp_sessions[session_id] = cdp
+
+            def on_frame(params):
+                session_id_inner = session_id
+                frame_data = params.get("data", "")
+                meta = params.get("metadata", {})
+                # Acknowledge frame so CDP sends the next one
+                try:
+                    cdp.send("Page.screencastFrameAck", {"sessionId": params["sessionId"]})
+                except Exception:
+                    pass
+                # Invoke the user-provided callback with the base64 frame
+                if callback:
+                    callback(session_id_inner, frame_data, meta)
+
+            cdp.on("Page.screencastFrame", on_frame)
+            cdp.send("Page.startScreencast", {
+                "format": "jpeg",
+                "quality": 40,
+                "maxWidth": 1280,
+                "maxHeight": 720,
+                "everyNthFrame": 2,  # Send every 2nd frame for performance
+            })
+            self._screencast_sessions.add(session_id)
+        except Exception as e:
+            import logging
+            logging.getLogger("sandbox").error(f"Failed to start screencast: {e}")
+
+    def _stop_screencast_sync(self, session_id):
+        """Stop CDP screencast (sync, playwright thread)."""
+        cdp = self._cdp_sessions.pop(session_id, None)
+        if cdp:
+            try:
+                cdp.send("Page.stopScreencast")
+                cdp.detach()
+            except Exception:
+                pass
+        self._screencast_sessions.discard(session_id)
+
     def _shutdown_sync(self):
         """Close all sessions and the browser (sync)."""
         for session_id in list(self._contexts.keys()):
@@ -262,7 +330,7 @@ class SandboxManager:
 
     async def _run_on_pw_thread(self, fn, *args):
         """Run a sync function on the dedicated Playwright thread."""
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         return await loop.run_in_executor(self._executor, fn, *args)
 
     async def create_session(self, session_id=None):
@@ -284,6 +352,18 @@ class SandboxManager:
         result = await self._run_on_pw_thread(self._shutdown_sync)
         self._executor.shutdown(wait=False)
         return result
+
+    async def take_screenshot(self, session_id):
+        return await self._run_on_pw_thread(self._take_screenshot_sync, session_id)
+
+    async def get_page_url(self, session_id):
+        return await self._run_on_pw_thread(self._get_page_url_sync, session_id)
+
+    async def start_screencast(self, session_id, callback):
+        return await self._run_on_pw_thread(self._start_screencast_sync, session_id, callback)
+
+    async def stop_screencast(self, session_id):
+        return await self._run_on_pw_thread(self._stop_screencast_sync, session_id)
 
     def get_session_info(self, session_id):
         """Get info about a sandbox session (non-blocking, reads only)."""

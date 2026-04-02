@@ -76,6 +76,42 @@ export function useWebSocket() {
         action: msg.data.action,
         hitlResolved: msg.data,
       }));
+
+    } else if (msg.type === 'LIVE_FRAME') {
+      // CDP Screencast: continuous live video frames
+      setDashboardData(prev => ({
+        ...prev,
+        liveFrame: msg.data.frame,  // base64 JPEG from CDP
+      }));
+
+    } else if (msg.type === 'AGENT_STEP') {
+      // Phase 5: Agent reasoning step (no screenshot — that's handled by LIVE_FRAME)
+      setDashboardData(prev => ({
+        ...prev,
+        agentStatus: msg.data.agentStatus,
+        currentGoal: msg.data.currentGoal,
+        currentUrl: msg.data.currentUrl,
+        agentStepInfo: msg.data.stepInfo,
+        agentStepsLog: msg.data.stepsLog || [],
+      }));
+
+    } else if (msg.type === 'AGENT_STARTED') {
+      setDashboardData(prev => ({
+        ...prev,
+        agentStatus: 'started',
+        currentGoal: msg.data?.goal || prev?.currentGoal,
+        agentStepsLog: [],
+        liveFrame: null,
+      }));
+
+    } else if (msg.type === 'AGENT_STOPPED') {
+      setDashboardData(prev => ({
+        ...prev,
+        agentStatus: 'idle',
+      }));
+
+    } else if (msg.type === 'AGENT_CLEARED') {
+      setDashboardData(null);
     }
   }, []);
 
